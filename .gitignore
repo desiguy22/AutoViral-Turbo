@@ -1,0 +1,33 @@
+# Python & Virtual Environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Model weights & Large Binaries
+*.pt
+*.pth
+*.onnx
+*.bin
+*.safetensors
+
+# Media & Temporary Files
+.cache/
+*.mp4
+*.wav
+*.mkv
+*.avi
+*.mov
+*.ass
+test_out.ass
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
