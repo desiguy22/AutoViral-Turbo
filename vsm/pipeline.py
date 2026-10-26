@@ -49,7 +49,7 @@ def process_video(src_video, output_dir=None, num_shorts=5, min_len=20.0, max_le
     # "create a seperate folder with video name and dump all shorts in that folder,
     # also the shorts name should be the title of the shorts"
     if output_dir is None:
-        output_dir = os.path.join(os.path.dirname(src_video), "viral_shorts")
+        output_dir = os.path.join(os.path.dirname(src_video), "viral shorts")
         
     video_out_dir = os.path.join(output_dir, video_name)
     cache_dir = os.path.join(video_out_dir, ".cache")
@@ -136,7 +136,16 @@ def process_video(src_video, output_dir=None, num_shorts=5, min_len=20.0, max_le
 
         out_mp4 = os.path.join(video_out_dir, f"{final_filename}.mp4")
         out_meta = os.path.join(video_out_dir, f"{final_filename}.json")
-        ass_path = os.path.join(cache_dir, f"{final_filename}.ass")
+        ass_path = os.path.join(cache_dir, f"short_{idx}.ass")
+
+        if os.path.isfile(out_mp4) and os.path.getsize(out_mp4) > 1024 * 1024 and os.path.isfile(out_meta):
+            print(f"\n[{idx}/{len(ranked)}] '{meta['title']}' already rendered ({round(os.path.getsize(out_mp4)/(1024*1024), 1)} MB), skipping.")
+            try:
+                with open(out_meta, "r", encoding="utf-8") as f:
+                    rendered_shorts.append(json.load(f))
+                continue
+            except Exception:
+                pass
 
         # Determine framing layout
         if forced_layout:

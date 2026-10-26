@@ -16,7 +16,7 @@ from . import media
 
 def escape_ass_path(path):
     """Format path for FFmpeg ass filter on Windows."""
-    abs_p = os.path.abspath(path).replace("\\", "/").replace(":", r"\:")
+    abs_p = os.path.abspath(path).replace("\\", "/").replace(":", r"\:").replace(",", r"\,")
     return f"filename='{abs_p}'"
 
 def sanitize_drawtext(s):
