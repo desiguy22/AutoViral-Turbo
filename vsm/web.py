@@ -484,17 +484,45 @@ function renderCards(list) {
           <span>⏱ ${s.duration ? s.duration.toFixed(1) + 's' : ''}</span>
           <span>💾 ${s.size_mb} MB</span>
         </div>
-        <button class="btn-copy" onclick='copyMeta(${JSON.stringify(s)})'>📋 Copy Title & Tags</button>
+        <button class="btn-copy">📋 Copy Title & Tags</button>
       </div>
     `;
+    const copyBtn = card.querySelector('.btn-copy');
+    copyBtn.addEventListener('click', () => copyMeta(s));
     grid.appendChild(card);
   });
 }
 
+function copyTextToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+  } else {
+    return fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text) {
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.style.position = "fixed";
+  textArea.style.left = "-999999px";
+  textArea.style.top = "-999999px";
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+  try {
+    document.execCommand('copy');
+  } catch (err) {
+    console.error('Fallback copy failed', err);
+  }
+  document.body.removeChild(textArea);
+  return Promise.resolve();
+}
+
 function copyMeta(s) {
-  const tags = (s.hashtags && s.hashtags.length) ? s.hashtags.join(' ') : '#Shorts #Gaming #Viral';
-  const text = `${s.title}\\n\\n${s.description || ''}\\n\\n${tags}`;
-  navigator.clipboard.writeText(text).then(() => {
+  const tags = (s.hashtags && s.hashtags.length) ? (Array.isArray(s.hashtags) ? s.hashtags.join(' ') : s.hashtags) : '#Shorts #Gaming #Viral';
+  const text = `${s.title}\n\n${s.description || ''}\n\n${tags}`;
+  copyTextToClipboard(text).then(() => {
     showToast('Copied Title & Tags for "' + s.title + '"!');
   });
 }
