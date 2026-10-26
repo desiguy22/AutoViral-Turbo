@@ -190,32 +190,6 @@ HTML_PAGE = """<!DOCTYPE html>
     object-fit: cover;
     background: #000;
   }
-  .hook-preview-overlay {
-    position: absolute;
-    top: 14px;
-    left: 12px;
-    right: 12px;
-    pointer-events: none;
-    text-align: center;
-  }
-  .hook-badge {
-    display: inline-block;
-    background: rgba(255, 0, 0, 0.9);
-    color: white;
-    font-family: 'Impact', sans-serif;
-    font-size: 0.75rem;
-    padding: 3px 8px;
-    border-radius: 4px;
-    letter-spacing: 0.5px;
-    margin-bottom: 4px;
-  }
-  .hook-headline {
-    color: #fff;
-    font-family: 'Impact', sans-serif;
-    font-size: 1.05rem;
-    text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000;
-    line-height: 1.15;
-  }
   .card-body {
     padding: 16px;
     display: flex;
@@ -480,10 +454,6 @@ function renderCards(list) {
     card.innerHTML = `
       <div class="player-wrapper">
         <video controls preload="metadata" playsinline src="/api/video?path=${encodeURIComponent(s.path)}"></video>
-        <div class="hook-preview-overlay">
-          <div class="hook-badge">${escapeHtml(s.hook_sub || 'WATCH NOW')}</div>
-          <div class="hook-headline">${escapeHtml(s.hook_top || '')}</div>
-        </div>
       </div>
       <div class="card-body">
         <div class="card-title">${escapeHtml(s.title)}</div>
