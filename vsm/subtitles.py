@@ -1,9 +1,9 @@
 """Word-by-word animated subtitle generator (ASS format) for Instagram Reels and YouTube Shorts.
 
 Creates modern high-retention karaoke/highlight subtitles from Whisper word timestamps:
-- Bold uppercase font with heavy dark outline for 100% legibility over any background
-- Highlights active spoken word in bright Yellow while surrounding words are White
-- Groups words in short 3-6 word phrases to keep viewers reading effortlessly
+- Bold uppercase Impact font with heavy dark outline (8px) and drop shadow for 100% legibility
+- Highlights active spoken word in Neon Yellow while surrounding words are Crisp White
+- Groups words in short 3-4 word phrases to keep viewers reading effortlessly
 - Safe-zone positioned in the lower-third (avoiding Instagram/TikTok UI buttons)
 """
 import math
@@ -23,7 +23,6 @@ def format_ass_time(seconds):
 
 def create_ass_subtitles(clip_sentences, clip_start, clip_end, out_ass_path):
     """Generate an .ass subtitle file with word-level karaoke highlighting for the clip."""
-    # Collect all words within [clip_start, clip_end]
     all_words = []
     for s in clip_sentences:
         for w in s.get("words", []):
@@ -37,9 +36,9 @@ def create_ass_subtitles(clip_sentences, clip_start, clip_end, out_ass_path):
                     "end": w_et
                 })
                 
-    # ASS Header
+    # ASS Header with Impact / Arial Black bold styling
     header = """[Script Info]
-Title: Viral Shorts Animated Subtitles
+Title: AutoViral Turbo Animated Subtitles
 ScriptType: v4.00+
 WrapStyle: 0
 ScaledBorderAndShadow: yes
@@ -49,58 +48,55 @@ PlayResY: 1920
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: ViralMain,Arial,60,&H00FFFFFF,&H0000FFFF,&H00000000,&H90000000,-1,0,0,0,100,100,1,0,1,6,3,2,80,80,440,1
+Style: ViralMain,Impact,74,&H00FFFFFF,&H0000FFFF,&H00000000,&H90000000,-1,0,0,0,100,100,2,0,1,8,4,2,60,60,380,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     if not all_words:
-        # Write empty valid ASS file
         with open(out_ass_path, "w", encoding="utf-8") as f:
             f.write(header)
         return out_ass_path
 
-    # Chunk words into small visual phrases (3 to 5 words each)
+    # Chunk words into small visual phrases (2 to 4 words each for fast reading)
     chunks = []
     current_chunk = []
     for w in all_words:
         current_chunk.append(w)
-        # End chunk if punctuation or length reached
-        if len(current_chunk) >= 4 or w["word"].endswith((".", "!", "?", "...", ",")):
+        if len(current_chunk) >= 3 or w["word"].endswith((".", "!", "?", "...", ",")):
             chunks.append(current_chunk)
             current_chunk = []
     if current_chunk:
         chunks.append(current_chunk)
 
     events = []
-    # For each chunk, emit events for each active word highlighted in Yellow
     for chunk in chunks:
         chunk_start = chunk[0]["start"]
         chunk_end = chunk[-1]["end"]
         
         for active_idx, active_word in enumerate(chunk):
             w_start = active_word["start"]
-            # Active word duration until next word starts or chunk ends
             if active_idx + 1 < len(chunk):
                 w_end = chunk[active_idx + 1]["start"]
             else:
                 w_end = active_word["end"] + 0.15
-            w_end = min(chunk_end + 0.3, max(w_start + 0.1, w_end))
+            w_end = min(chunk_end + 0.25, max(w_start + 0.08, w_end))
             
             line_parts = []
             for idx, w in enumerate(chunk):
                 clean_w = w["word"].replace("{", "").replace("}", "")
                 if idx == active_idx:
-                    # Highlight active word in Yellow (&H0000FFFF) with slight scale up
-                    line_parts.append(r"{\c&H0000FFFF\fscx108\fscy108}" + clean_w + r"{\rViralMain}")
+                    # Neon Yellow (&H0000FFFF) with slight pop
+                    line_parts.append(r"{\c&H0000FFFF\fscx110\fscy110}" + clean_w + r"{\rViralMain}")
                 else:
-                    # Regular white word
                     line_parts.append(clean_w)
                     
             full_line_text = " ".join(line_parts)
-            events.append(f"Dialogue: 0,{format_ass_time(w_start)},{format_ass_time(w_end)},ViralMain,,0,0,0,,{full_line_text}")
+            st_str = format_ass_time(w_start)
+            et_str = format_ass_time(w_end)
+            events.append(f"Dialogue: 0,{st_str},{et_str},ViralMain,,0,0,0,,{full_line_text}")
 
     with open(out_ass_path, "w", encoding="utf-8") as f:
         f.write(header + "\n".join(events) + "\n")
-
+        
     return out_ass_path

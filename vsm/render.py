@@ -31,11 +31,12 @@ def build_filter_graph(src_probe, layout, crop_x_pct, hook_top, hook_sub, ass_pa
     hs = sanitize_drawtext(hook_sub)
     ass_escaped = escape_ass_path(ass_path)
     
+    # Modern high-contrast hook card (Urgency Pill + Bold Headline)
     hook_filters = (
-        f"drawtext=text='{ht}':font='Arial':fontsize=48:fontcolor=yellow:"
-        f"box=1:boxcolor=black@0.88:boxborderw=18:x=(w-text_w)/2:y=240:enable='between(t,0,2.5)',"
-        f"drawtext=text='{hs}':font='Arial':fontsize=40:fontcolor=white:"
-        f"box=1:boxcolor=red@0.88:boxborderw=14:x=(w-text_w)/2:y=335:enable='between(t,0,2.5)',"
+        f"drawtext=text='{hs}':font='Impact':fontsize=44:fontcolor=white:"
+        f"box=1:boxcolor=red@0.90:boxborderw=12:borderw=4:bordercolor=black:x=(w-text_w)/2:y=190:enable='between(t,0,2.5)',"
+        f"drawtext=text='{ht}':font='Impact':fontsize=56:fontcolor=white:"
+        f"borderw=6:bordercolor=black:shadowx=4:shadowy=4:x=(w-text_w)/2:y=275:enable='between(t,0,2.5)',"
         f"ass={ass_escaped}"
     )
 
@@ -51,14 +52,14 @@ def build_filter_graph(src_probe, layout, crop_x_pct, hook_top, hook_sub, ass_pa
             f"{hook_filters}[v]"
         )
     else:
-        # Standard blurred top/bottom with 16:9 centered
+        # Enhanced cinematic blurred top/bottom with larger 1080x720 centered video
         fg = (
             "[0:v]split=2[in_bg][in_fg];"
-            "[in_bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=24:5,eq=brightness=-0.12:saturation=1.2,setsar=1[bg];"
-            "[in_fg]scale=1080:608,setsar=1[fg];"
-            "[bg][fg]overlay=x=0:y=656,"
-            "drawbox=y=653:color=white@0.35:width=1080:height=3:t=fill,"
-            "drawbox=y=1264:color=white@0.35:width=1080:height=3:t=fill,"
+            "[in_bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=20:5,eq=brightness=0.04:saturation=1.4,setsar=1[bg];"
+            "[in_fg]scale=1080:720,setsar=1[fg];"
+            "[bg][fg]overlay=x=0:y=600,"
+            "drawbox=y=597:color=white@0.4:width=1080:height=3:t=fill,"
+            "drawbox=y=1320:color=white@0.4:width=1080:height=3:t=fill,"
             f"{hook_filters}[v]"
         )
         
@@ -104,5 +105,4 @@ def render_short(src_video, start_t, end_t, layout, crop_x_pct, hook_top, hook_s
                 "out_path": out_mp4
             }
 
-    # If both failed, raise error with stderr
     raise RuntimeError(f"FFmpeg render failed for {out_mp4}:\n{res.stderr[-1000:]}")

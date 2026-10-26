@@ -306,21 +306,19 @@ def compare_trackers(src_video, start_t, end_t, num_samples=16, visual_dump_path
         reasons.append("YOLO not installed; OpenCV used by default")
 
     # Framing Recommendation
-    # If the winning tracker has a stable localized subject, smart crop is viable
+    # Full-screen 9:16 edge-to-edge vertical framing is the gold standard for Shorts & Reels
     win_std = yolo_std_x if winner == "yolo" else cv_std_x
     win_det = yolo_det_rate if winner == "yolo" else cv_face_rate
     win_mean_x = yolo_mean_x if winner == "yolo" else cv_mean_x
 
-    if win_det >= 0.35 and win_std < 0.18:
+    if win_std < 0.25:
         layout = "smart_crop"
         crop_x = win_mean_x
-        reasons.append(f"Recommended layout: 'smart_crop' centered at x={crop_x:.2f} using {winner.upper()}")
+        reasons.append(f"Recommended layout: 'smart_crop' (edge-to-edge vertical 9:16 action centered at x={crop_x:.2f})")
     else:
-        # In widescreen gaming with fast camera rotations or wide HUD elements,
-        # blur_padding is dramatically superior because it retains all game UI and HUD.
         layout = "blur_padding"
         crop_x = 0.5
-        reasons.append("Recommended layout: 'blur_padding' (wide action/HUD spans canvas; preserves full view)")
+        reasons.append("Recommended layout: 'blur_padding' (wide panoramic action spans canvas; preserves full view)")
 
     # Optional: Save visual comparison frame
     if visual_dump_path and sample_frames:
@@ -430,10 +428,10 @@ def analyze_framing(src_video, start_t, end_t, num_samples=16, tracker="auto", v
                         confs.append(res["confidence"])
             cap.release()
 
-            if len(xs) >= (num_samples * 0.35) and float(np.std(xs)) < 0.18:
+            if len(xs) > 0 and float(np.std(xs)) < 0.25:
                 return "smart_crop", float(np.median(xs)), {"tracker": "yolo", "samples": len(xs)}
-            if tracker == "yolo":
-                return "blur_padding", 0.5, {"tracker": "yolo", "reason": "No single stable subject window"}
+            # In first-person / action gameplay, centered smart crop fills the mobile screen perfectly
+            return "smart_crop", 0.5, {"tracker": "yolo_center", "reason": "Edge-to-edge vertical 9:16 action"}
 
     # OpenCV fallback or explicit opencv tracker
     cv_tracker = OpenCVTracker()
@@ -451,7 +449,7 @@ def analyze_framing(src_video, start_t, end_t, num_samples=16, tracker="auto", v
     cap.release()
 
     face_count = sum(1 for tp in types if tp == "face")
-    if face_count >= (num_samples * 0.35) and float(np.std(xs)) < 0.18:
+    if face_count >= (num_samples * 0.25) and float(np.std(xs)) < 0.25:
         return "smart_crop", float(np.median(xs)), {"tracker": "opencv", "face_count": face_count}
 
-    return "blur_padding", 0.5, {"tracker": "opencv", "reason": "Preserve 16:9 widescreen HUD"}
+    return "smart_crop", 0.5, {"tracker": "opencv", "reason": "Edge-to-edge vertical 9:16 action"}
