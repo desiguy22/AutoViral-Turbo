@@ -23,7 +23,7 @@ if HERE not in sys.path:
 
 from vsm import pipeline
 
-def run_batch(video_paths, num_shorts=10, out_base=None):
+def run_batch(video_paths, num_shorts=10, out_base=None, force=False):
     if out_base is None:
         out_base = "S:/edited vid/viral shorts"
     os.makedirs(out_base, exist_ok=True)
@@ -33,6 +33,7 @@ def run_batch(video_paths, num_shorts=10, out_base=None):
     print(f"📹 Videos queued: {len(video_paths)}")
     print(f"🎯 Target shorts per video: {num_shorts}")
     print(f"📂 Output base directory: {out_base}")
+    print(f"🔄 Force regeneration: {force}")
     print(f"================================================================\n")
 
     overall_start = time.time()
@@ -55,7 +56,8 @@ def run_batch(video_paths, num_shorts=10, out_base=None):
                 max_len=45.0,
                 target_len=32.0,
                 tracker="auto",
-                use_local_llm=True
+                use_local_llm=True,
+                force=force
             )
             v_elapsed = time.time() - v_start
             results[vname] = {"status": "SUCCESS", "count": len(shorts), "time_sec": v_elapsed}
@@ -84,9 +86,16 @@ def run_batch(video_paths, num_shorts=10, out_base=None):
     print("================================================================\n")
 
 if __name__ == "__main__":
-    # If args passed, use them; otherwise default to the 7 COD MW4 videos
-    if len(sys.argv) > 1:
-        targets = sys.argv[1:]
+    force = False
+    args = []
+    for a in sys.argv[1:]:
+        if a == "--force":
+            force = True
+        else:
+            args.append(a)
+
+    if args:
+        targets = args
     else:
         # Default order: finish codmw4_7 extract, then shorter ones first (4, 6), then longer (1, 2, 5)
         # Note: codmw4_3 already has 10 shorts, so it will instantly verify and skip
@@ -102,4 +111,4 @@ if __name__ == "__main__":
         ]
         targets = [os.path.join(source_dir, f) for f in priority_order if os.path.exists(os.path.join(source_dir, f))]
 
-    run_batch(targets, num_shorts=10)
+    run_batch(targets, num_shorts=10, force=force)

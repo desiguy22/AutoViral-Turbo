@@ -9,6 +9,7 @@ import os
 import sys
 import json
 import csv
+import glob
 import time
 
 from . import media
@@ -23,7 +24,7 @@ from . import render
 
 def process_video(src_video, output_dir=None, num_shorts=5, min_len=20.0, max_len=45.0,
                   target_len=32.0, whisper_model="base", forced_layout=None,
-                  tracker="auto", use_local_llm=True, progress_cb=None):
+                  tracker="auto", use_local_llm=True, progress_cb=None, force=False):
     """Process a single video into high-engagement viral shorts.
     
     Args:
@@ -56,6 +57,21 @@ def process_video(src_video, output_dir=None, num_shorts=5, min_len=20.0, max_le
     cache_dir = os.path.join(video_out_dir, ".cache")
     os.makedirs(video_out_dir, exist_ok=True)
     os.makedirs(cache_dir, exist_ok=True)
+
+    if force:
+        print(f"-> Force regeneration enabled: clearing previous shorts and transcripts for {video_name}")
+        for ext in ("*.mp4", "*.json", "*_thumb.jpg", "*.csv", "*.md"):
+            for f in glob.glob(os.path.join(video_out_dir, ext)):
+                try:
+                    os.remove(f)
+                except Exception:
+                    pass
+        tr_cache = os.path.join(cache_dir, "transcript.json")
+        if os.path.isfile(tr_cache):
+            try:
+                os.remove(tr_cache)
+            except Exception:
+                pass
 
     print(f"\n=================================================================")
     print(f"🎬 VIRAL SHORTS MAKER: {video_name}")
@@ -141,7 +157,7 @@ def process_video(src_video, output_dir=None, num_shorts=5, min_len=20.0, max_le
         out_meta = os.path.join(video_out_dir, f"{final_filename}.json")
         ass_path = os.path.join(cache_dir, f"short_{idx}.ass")
 
-        if os.path.isfile(out_mp4) and os.path.getsize(out_mp4) > 1024 * 1024 and os.path.isfile(out_meta):
+        if not force and os.path.isfile(out_mp4) and os.path.getsize(out_mp4) > 1024 * 1024 and os.path.isfile(out_meta):
             print(f"\n[{idx}/{len(ranked)}] '{meta['title']}' already rendered ({round(os.path.getsize(out_mp4)/(1024*1024), 1)} MB), skipping.")
             try:
                 out_thumb = os.path.join(video_out_dir, f"{final_filename}_thumb.jpg")
