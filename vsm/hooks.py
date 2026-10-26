@@ -58,7 +58,7 @@ def get_local_llm():
     return _GLOBAL_LLM, _GLOBAL_TOKENIZER
 
 
-def generate_metadata_local_llm(moment, video_title="Gameplay"):
+def generate_metadata_local_llm(moment, video_title="Gameplay", existing_titles=None):
     """Generate viral metadata using local neural LLM on GPU."""
     model, tok = get_local_llm()
     if model is None or tok is None:
@@ -66,22 +66,36 @@ def generate_metadata_local_llm(moment, video_title="Gameplay"):
 
     sents = moment.get("sentences", [])
     full_text = " ".join(s["text"] for s in sents).strip()
+    parts = moment.get("parts", {})
+
+    # Action context when voice lines are sparse or silent
     if not full_text:
-        return None
+        full_text = (
+            f"High-intensity gameplay combat sequence (Audio Peak: {parts.get('peak', 1.5):.1f}, "
+            f"Motion Energy: {parts.get('motion', 1.0):.1f}, Pacing: {parts.get('pacing', 1.0):.1f}). "
+            f"Pure tactical gunplay and explosive action with zero dialogue."
+        )
+
+    avoid_clause = ""
+    if existing_titles:
+        sample_avoid = [t for t in list(existing_titles)[-8:] if t]
+        if sample_avoid:
+            avoid_clause = "\nDo NOT use or repeat any of these titles:\n" + "\n".join(f"- {t}" for t in sample_avoid) + "\n"
 
     prompt = (
         "<|im_start|>system\n"
-        "You are an elite viral shorts creator. Given gameplay dialogue, return JSON only with:\n"
+        "You are an elite viral shorts creator. Given gameplay dialogue or action signals, return JSON only with:\n"
         "- title: High-CTR YouTube Shorts / Reels title (4-8 words, engaging, capitalized)\n"
         "- hook_top: 2-5 words ALL CAPS punchy headline\n"
         "- hook_sub: 2-4 words urgent prompt (e.g. WATCH CLOSELY!! or WAIT FOR IT...)\n"
-        "- theme: category (action, betrayal, standoff, clutch, chaos, lore)\n\n"
+        "- theme: category (action, betrayal, standoff, clutch, chaos, lore)\n"
+        f"{avoid_clause}\n"
         "Example 1:\n"
         "Input: Price: RPG on the roof! Take cover right now!\n"
         "Output: {\"title\": \"Ambushed By RPGs On The Roof\", \"hook_top\": \"ENEMY RPG AMBUSH INCOMING\", \"hook_sub\": \"TAKE COVER RIGHT NOW!!\", \"theme\": \"action\"}\n\n"
         "Example 2:\n"
-        "Input: Ghost: He pulled out a concealed blade! Check your six!\n"
-        "Output: {\"title\": \"Close Quarters Concealed Knife Struggle\", \"hook_top\": \"HE PULLED A CONCEALED BLADE\", \"hook_sub\": \"WATCH HIS HANDS!!\", \"theme\": \"suspense\"}\n"
+        "Input: High-intensity gameplay combat sequence (Audio Peak: 2.2, Motion Energy: 1.8). Pure tactical gunplay.\n"
+        "Output: {\"title\": \"Point Blank Crossfire Survival\", \"hook_top\": \"ENEMY FORCES OVERRUN POSITION\", \"hook_sub\": \"WATCH THIS PLAY!!\", \"theme\": \"action\"}\n"
         "<|im_end|>\n"
         "<|im_start|>user\n"
         f"Input: {full_text[:300]}\n"
@@ -133,59 +147,59 @@ def generate_metadata_local_llm(moment, video_title="Gameplay"):
     return None
 
 
-def generate_metadata_heuristic(moment, video_title="Gameplay"):
-    """Heuristic rule-based viral hook and title generation from dialogue and signals."""
+TACTICAL_FALLBACKS = [
+    ("WHEN THE SQUAD GETS PINNED DOWN", "DON'T LOOK AWAY!!", "Pinned Down Under Heavy Suppression", "action"),
+    ("POINT BLANK GUNFIGHT CLUTCH", "WATCH THIS REACTION!!", "Point Blank Gunfight Reaction Time", "clutch"),
+    ("THEY THOUGHT THEY HAD US TRAPPED", "BIGGEST MISTAKE EVER!", "They Thought They Had Us Trapped", "action"),
+    ("ZERO MARGIN FOR ERROR", "HOLD YOUR BREATH...", "Zero Margin For Error in Gunfight", "suspense"),
+    ("WHEN REINFORCEMENTS DON'T ARRIVE", "FIGHT FOR YOUR LIFE!", "When Reinforcements Never Arrive", "action"),
+    ("BREACH AND CLEAR IN SILENCE", "PERFECT EXECUTION!!", "Breach And Clear Tactical Infiltration", "stealth"),
+    ("LAST MAG AND ENEMY CLOSING IN", "OUT OF AMMO!!", "Last Magazine Against Entire Squad", "clutch"),
+    ("PERFECT FLANK ATTACK", "NEVER SAW IT COMING!", "Sneaking Up Behind Enemy Lines", "tactical"),
+    ("SNIPER STANDOFF AT 300 METERS", "ONE SHOT ONE KILL!", "High Stakes Sniper Duel", "sniper"),
+    ("WHEN EVERYTHING GOES COMPLETELY WRONG", "CAN WE SURVIVE THIS?", "When The Mission Goes Off The Rails", "chaos"),
+    ("THE MOST CHAOTIC FIREFIGHT EVER", "BULLETS FLYING EVERYWHERE!", "Chaotic Firefight Under Heavy Fire", "chaos"),
+    ("HEAVY CALIBER CROSSFIRE", "DUCK AND COVER!!", "Caught in Heavy Caliber Crossfire", "action"),
+    ("SOLO CLUTCH IN HOSTILE TERRITORY", "NEVER GIVE UP!", "Solo Clutch in Hostile Territory", "clutch"),
+    ("SURPRISE AMBUSH OUT OF NOWHERE", "CHECK YOUR CORNERS!!", "Ambushed While Pushing Forward", "action"),
+    ("HIGH INTENSITY COMBAT RUN", "SPRINT TO COVER NOW!!", "High Velocity Tactical Push", "action")
+]
+
+
+def generate_metadata_heuristic(moment, video_title="Gameplay", existing_titles=None):
+    """Heuristic rule-based viral hook and title generation with deduplication."""
     sents = moment.get("sentences", [])
     full_text = " ".join(s["text"] for s in sents).strip()
     parts = moment.get("parts", {})
     txt_lower = full_text.lower()
+    used = set(existing_titles or [])
     
+    cand = None
     if any(k in txt_lower for k in ["price", "ghost", "shepherd", "makarov", "bravo"]):
-        hook_top = "CAPTAIN PRICE'S COLD-BLOODED RULE"
-        hook_sub = "TASK FORCE 141 DOCTRINE"
-        title = "Captain Price Reveals His Coldest Rule"
-        theme = "lore"
+        cand = ("CAPTAIN PRICE'S COLD-BLOODED RULE", "TASK FORCE 141 DOCTRINE", "Captain Price Reveals His Coldest Rule", "lore")
     elif any(k in txt_lower for k in ["rpg", "missile", "rocket", "artillery", "grenade"]):
-        hook_top = "WHEN AN ENTIRE ARMY LAUNCHES AN AMBUSH"
-        hook_sub = "GRAB THE RPG RIGHT NOW!!"
-        title = "The Most Chaotic RPG Ambush Ever"
-        theme = "action"
+        cand = ("WHEN AN ENTIRE ARMY LAUNCHES AN AMBUSH", "GRAB THE RPG RIGHT NOW!!", "The Most Chaotic RPG Ambush Ever", "action")
     elif any(k in txt_lower for k in ["civilian", "hostage", "save", "evacuate", "bridge"]):
-        hook_top = "CIVILIANS TRAPPED UNDER DIRECT FIRE"
-        hook_sub = "CHECK YOUR FIRE!!"
-        title = "Protecting Civilians Under Direct Fire"
-        theme = "rescue"
+        cand = ("CIVILIANS TRAPPED UNDER DIRECT FIRE", "CHECK YOUR FIRE!!", "Protecting Civilians Under Direct Fire", "rescue")
     elif any(k in txt_lower for k in ["knife", "blade", "cut", "stab"]):
-        hook_top = "HE PULLED OUT A CONCEALED BLADE"
-        hook_sub = "WATCH HIS HANDS!!"
-        title = "Close Quarters Concealed Knife Struggle"
-        theme = "suspense"
+        cand = ("HE PULLED OUT A CONCEALED BLADE", "WATCH HIS HANDS!!", "Close Quarters Concealed Knife Struggle", "suspense")
     elif any(k in txt_lower for k in ["lost", "down", "dead", "killed", "die"]):
-        hook_top = "POV: YOUR SQUAD GETS AMBUSHED"
-        hook_sub = "NOBODY SURVIVES THIS..."
-        title = "POV When Your Mission Goes Completely Wrong"
-        theme = "disaster"
+        cand = ("POV: YOUR SQUAD GETS AMBUSHED", "NOBODY SURVIVES THIS...", "POV When Your Mission Goes Completely Wrong", "disaster")
     elif any(k in txt_lower for k in ["armor", "tank", "convoy", "vehicle"]):
-        hook_top = "WHEN ENEMY ARMOR ROLLS UP ON YOU"
-        hook_sub = "WHERE IS OUR AIR SUPPORT?!"
-        title = "Heavy Armored Convoy Rolls In Out Of Nowhere"
-        theme = "action"
+        cand = ("WHEN ENEMY ARMOR ROLLS UP ON YOU", "WHERE IS OUR AIR SUPPORT?!", "Heavy Armored Convoy Rolls In Out Of Nowhere", "action")
     elif any(k in txt_lower for k in ["stand down", "face me", "wrong side", "kill you"]):
-        hook_top = "FINAL 1V1 STANDOFF"
-        hook_sub = "STAND DOWN BEFORE I PUT YOU DOWN!"
-        title = "Intense 1v1 Standoff Before You Pull The Trigger"
-        theme = "showdown"
-    elif parts.get("energy", 0) > 0.8 or parts.get("peak", 0) > 2.0:
-        hook_top = "THE MOST INTENSE MOMENT IN CALL OF DUTY"
-        hook_sub = "MAXIMUM ADRENALINE!!"
-        title = "Absolute Chaos in Call of Duty"
-        theme = "action"
-    else:
-        hook_top = "YOU WON'T BELIEVE WHAT HAPPENED NEXT"
-        hook_sub = "WAIT TILL THE END..."
-        title = "Unbelievable Tactical Moment"
-        theme = "curiosity"
+        cand = ("FINAL 1V1 STANDOFF", "STAND DOWN BEFORE I PUT YOU DOWN!", "Intense 1v1 Standoff Before You Pull The Trigger", "showdown")
 
+    # If no keyword matched or candidate title was already used, select a fresh unique action title
+    if cand is None or cand[2] in used:
+        for fallback in TACTICAL_FALLBACKS:
+            if fallback[2] not in used:
+                cand = fallback
+                break
+        if cand is None:
+            cand = TACTICAL_FALLBACKS[0]
+
+    hook_top, hook_sub, title, theme = cand
     _, h_score, h_verdict, h_formula = hookscore.score(f"{hook_top} - {hook_sub}")
     
     desc = (
@@ -212,11 +226,15 @@ def generate_metadata_heuristic(moment, video_title="Gameplay"):
     }
 
 
-def generate_metadata(moment, video_title="Gameplay", use_local_llm=True):
-    """Generate viral metadata, trying local LLM first, falling back to heuristics."""
+def generate_metadata(moment, video_title="Gameplay", use_local_llm=True, existing_titles=None):
+    """Generate viral metadata, trying local LLM first, falling back to heuristics with deduplication."""
     if use_local_llm:
-        res = generate_metadata_local_llm(moment, video_title)
+        res = generate_metadata_local_llm(moment, video_title, existing_titles=existing_titles)
         if res is not None:
-            return res
+            # If the LLM returned a title already seen, don't blindly duplicate
+            if existing_titles and res["title"] in existing_titles:
+                pass
+            else:
+                return res
 
-    return generate_metadata_heuristic(moment, video_title)
+    return generate_metadata_heuristic(moment, video_title, existing_titles=existing_titles)

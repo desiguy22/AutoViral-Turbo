@@ -429,7 +429,10 @@ def analyze_framing(src_video, start_t, end_t, num_samples=16, tracker="auto", v
             cap.release()
 
             if len(xs) > 0 and float(np.std(xs)) < 0.25:
-                return "smart_crop", float(np.median(xs)), {"tracker": "yolo", "samples": len(xs)}
+                # Reticle / Crosshair bias: Keep central crosshairs in view while subtly framing detected subjects
+                raw_x = float(np.median(xs))
+                biased_x = float(np.clip(0.50 * 0.70 + raw_x * 0.30, 0.42, 0.58))
+                return "smart_crop", biased_x, {"tracker": "yolo_reticle_biased", "samples": len(xs), "raw_x": raw_x}
             # In first-person / action gameplay, centered smart crop fills the mobile screen perfectly
             return "smart_crop", 0.5, {"tracker": "yolo_center", "reason": "Edge-to-edge vertical 9:16 action"}
 
@@ -450,6 +453,8 @@ def analyze_framing(src_video, start_t, end_t, num_samples=16, tracker="auto", v
 
     face_count = sum(1 for tp in types if tp == "face")
     if face_count >= (num_samples * 0.25) and float(np.std(xs)) < 0.25:
-        return "smart_crop", float(np.median(xs)), {"tracker": "opencv", "face_count": face_count}
+        raw_x = float(np.median(xs))
+        biased_x = float(np.clip(0.50 * 0.65 + raw_x * 0.35, 0.40, 0.60))
+        return "smart_crop", biased_x, {"tracker": "opencv_reticle_biased", "face_count": face_count, "raw_x": raw_x}
 
     return "smart_crop", 0.5, {"tracker": "opencv", "reason": "Edge-to-edge vertical 9:16 action"}

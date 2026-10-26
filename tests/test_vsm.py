@@ -113,6 +113,20 @@ class TestViralShortsMaker(unittest.TestCase):
         self.assertIn("crop=", fg_crop)
         self.assertIn("TOP HOOK", fg_crop)
 
+    def test_title_deduplication(self):
+        moment = {
+            "start": 0.0,
+            "end": 30.0,
+            "sentences": [],
+            "parts": {"energy": 0.9, "peak": 2.5}
+        }
+        seen = set()
+        for _ in range(5):
+            meta = hooks.generate_metadata(moment, video_title="CODMW4", use_local_llm=False, existing_titles=seen)
+            self.assertNotIn(meta["title"], seen)
+            seen.add(meta["title"])
+        self.assertEqual(len(seen), 5)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2,18 +2,25 @@ import os
 import glob
 
 base = "S:/edited vid/viral shorts"
-print(f"{'Folder Name':<32} | {'Shorts (MP4)':<14} | {'JSON Metadata':<14} | {'SUMMARY.md'}")
-print("-" * 75)
+print("================================================================================")
+print(f"{'Folder Name':<28} | {'Shorts':<6} | {'Total Size':<10} | {'Sample Short Titles'}")
+print("================================================================================")
 
 total_shorts = 0
+total_bytes = 0
+
 for d in sorted(os.listdir(base)):
     p = os.path.join(base, d)
     if os.path.isdir(p) and not d.startswith((".", "__", "frames", "visual", "vsm")):
-        mp4s = glob.glob(os.path.join(p, "*.mp4"))
-        jsons = glob.glob(os.path.join(p, "*.json"))
-        has_sum = os.path.exists(os.path.join(p, "SUMMARY.md"))
+        mp4s = sorted(glob.glob(os.path.join(p, "*.mp4")))
+        size = sum(os.path.getsize(f) for f in mp4s)
         total_shorts += len(mp4s)
-        print(f"{d:<32} | {len(mp4s):<14} | {len(jsons):<14} | {'YES' if has_sum else 'NO'}")
+        total_bytes += size
+        samples = ", ".join(f'"{os.path.splitext(os.path.basename(f))[0]}"' for f in mp4s[:2])
+        if len(mp4s) > 2:
+            samples += f", +{len(mp4s)-2} more"
+        print(f"{d:<28} | {len(mp4s):<6} | {size/(1024*1024):<7.1f} MB | {samples}")
 
-print("-" * 75)
-print(f"TOTAL VIRAL SHORTS GENERATED: {total_shorts}")
+print("================================================================================")
+print(f"TOTAL: {total_shorts} Viral Shorts | {total_bytes/(1024*1024*1024):.2f} GB rendered")
+print("================================================================================")

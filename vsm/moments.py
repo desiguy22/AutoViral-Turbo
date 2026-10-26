@@ -147,7 +147,12 @@ def rank_moments(segments, sig, duration, n=5, min_len=20.0, max_len=45.0, targe
            "s_starts": [s["start"] for s in sents], "s_ends": [s["end"] for s in sents],
            "feats": [sentence_features(s) for s in sents], "speech_mask": speech_mask,
            "cuts": sig.get("cuts", []), "target": target, "weights": weights or WEIGHTS}
-    pts = clean_points(sents, duration, sig.get("cuts", []))
+    # Detect natural audio pauses/valleys to snap clean boundaries during non-dialogue combat
+    transients = []
+    if len(zl) > 10:
+        valleys = np.where((zl[1:-1] < zl[:-2]) & (zl[1:-1] < zl[2:]) & (zl[1:-1] < 0.0))[0] + 1
+        transients = [round(float(v * res), 2) for v in valleys]
+    pts = clean_points(sents, duration, cuts=list(sig.get("cuts", [])) + transients)
     cands = []
     for i, s in enumerate(pts):
         j = bisect.bisect_left(pts, s + min_len - 1e-6)

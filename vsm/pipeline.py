@@ -113,6 +113,7 @@ def process_video(src_video, output_dir=None, num_shorts=5, min_len=20.0, max_le
     # 7. Render each moment into a complete Short
     rendered_shorts = []
     seen_filenames = set()
+    seen_titles = set()
 
     for idx, moment in enumerate(ranked, 1):
         pct = 0.50 + 0.45 * (idx / max(1, len(ranked)))
@@ -122,8 +123,9 @@ def process_video(src_video, output_dir=None, num_shorts=5, min_len=20.0, max_le
         m_end = moment["end"]
         m_dur = m_end - m_start
 
-        # Generate metadata (Title, Hook, Description, Hashtags) via Local LLM or Heuristics
-        meta = hooks.generate_metadata(moment, video_title=video_name, use_local_llm=use_local_llm)
+        # Generate metadata (Title, Hook, Description, Hashtags) via Local LLM or Heuristics with deduplication
+        meta = hooks.generate_metadata(moment, video_title=video_name, use_local_llm=use_local_llm, existing_titles=seen_titles)
+        seen_titles.add(meta["title"])
         
         # Ensure unique Windows-safe filename
         base_filename = meta["filename"]
