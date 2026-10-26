@@ -17,7 +17,7 @@ if HERE not in sys.path:
 if __name__ == "__main__":
     if "--web" in sys.argv:
         from vsm.web import start_server
-        port = 8080
+        port = 8501
         for i, arg in enumerate(sys.argv):
             if arg == "--port" and i + 1 < len(sys.argv):
                 port = int(sys.argv[i + 1])

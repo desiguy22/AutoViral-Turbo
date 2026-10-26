@@ -25,7 +25,7 @@ except Exception:
 
 from . import pipeline
 
-PORT = 8080
+PORT = 8501
 CURRENT_JOB = {
     "status": "idle",
     "step": "",
