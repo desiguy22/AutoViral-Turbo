@@ -8,6 +8,7 @@ Input Video -> Signals & Transcript -> Ranked Moments -> Subject Tracking & Fram
 import os
 import sys
 import json
+import csv
 import time
 
 from . import media
@@ -143,8 +144,13 @@ def process_video(src_video, output_dir=None, num_shorts=5, min_len=20.0, max_le
         if os.path.isfile(out_mp4) and os.path.getsize(out_mp4) > 1024 * 1024 and os.path.isfile(out_meta):
             print(f"\n[{idx}/{len(ranked)}] '{meta['title']}' already rendered ({round(os.path.getsize(out_mp4)/(1024*1024), 1)} MB), skipping.")
             try:
+                out_thumb = os.path.join(video_out_dir, f"{final_filename}_thumb.jpg")
+                if not os.path.isfile(out_thumb):
+                    render.extract_thumbnail(out_mp4, out_thumb, timestamp_sec=1.2)
                 with open(out_meta, "r", encoding="utf-8") as f:
-                    rendered_shorts.append(json.load(f))
+                    meta_data = json.load(f)
+                    meta_data["thumbnail"] = f"{final_filename}_thumb.jpg"
+                    rendered_shorts.append(meta_data)
                 continue
             except Exception:
                 pass
@@ -184,10 +190,15 @@ def process_video(src_video, output_dir=None, num_shorts=5, min_len=20.0, max_le
             out_mp4=out_mp4
         )
 
+        # Extract high-contrast 1080x1920 action poster thumbnail
+        out_thumb = os.path.join(video_out_dir, f"{final_filename}_thumb.jpg")
+        render.extract_thumbnail(out_mp4, out_thumb, timestamp_sec=1.2)
+
         # Save metadata sidecar
         full_meta = {
             "title": meta["title"],
             "filename": f"{final_filename}.mp4",
+            "thumbnail": f"{final_filename}_thumb.jpg",
             "start": m_start,
             "end": m_end,
             "duration": m_dur,
@@ -210,14 +221,42 @@ def process_video(src_video, output_dir=None, num_shorts=5, min_len=20.0, max_le
         rendered_shorts.append(full_meta)
         print(f"      Done in {res['elapsed']:.1f}s ({res['size_mb']:.1f} MB) -> {out_mp4}")
 
-    # 8. Generate Markdown Summary Report
+    # 8. Generate Markdown Summary Report and CSV Upload Manifest
     summary_md = os.path.join(video_out_dir, "SUMMARY.md")
     write_summary(summary_md, video_name, src_video, rendered_shorts, time.time() - t_start_total, tracker_reports.get("overall"))
+
+    manifest_csv = os.path.join(video_out_dir, "upload_manifest.csv")
+    write_manifest(manifest_csv, rendered_shorts)
 
     if progress_cb: progress_cb("Complete!", 1.0)
     print(f"\n🎉 ALL {len(rendered_shorts)} VIRAL SHORTS GENERATED SUCCESSFULLY IN {time.time()-t_start_total:.1f}s!")
     print(f"📂 Output Folder: {video_out_dir}")
     return rendered_shorts
+
+
+def write_manifest(csv_path, shorts):
+    """Write upload-ready manifest CSV for YouTube Studio & scheduler tools."""
+    fieldnames = [
+        "index", "title", "filename", "thumbnail", "duration",
+        "virality_score", "hook_headline", "hook_subtitle",
+        "description", "hashtags"
+    ]
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for idx, s in enumerate(shorts, 1):
+            writer.writerow({
+                "index": idx,
+                "title": s["title"],
+                "filename": s["filename"],
+                "thumbnail": s.get("thumbnail", f"{os.path.splitext(s['filename'])[0]}_thumb.jpg"),
+                "duration": round(s["duration"], 1),
+                "virality_score": s["virality_score"],
+                "hook_headline": s.get("hook_top", ""),
+                "hook_subtitle": s.get("hook_sub", ""),
+                "description": s.get("description", ""),
+                "hashtags": " ".join(s["hashtags"]) if isinstance(s.get("hashtags"), list) else str(s.get("hashtags", ""))
+            })
 
 
 def write_summary(md_path, video_name, src_video, shorts, total_sec, comp_report=None):

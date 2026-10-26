@@ -158,6 +158,21 @@ HTML_PAGE = """<!DOCTYPE html>
     outline: none;
   }
   .search-box:focus { border-color: var(--accent); }
+  .btn-manifest {
+    background: #1c2130;
+    border: 1px solid var(--border);
+    color: var(--green);
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-manifest:hover {
+    background: rgba(0, 230, 118, 0.15);
+    border-color: var(--green);
+  }
 
   .shorts-grid {
     display: grid;
@@ -343,7 +358,10 @@ HTML_PAGE = """<!DOCTYPE html>
     <div class="folder-pills" id="folderPills">
       <div class="folder-pill active" onclick="filterFolder('ALL')">All Collections</div>
     </div>
-    <input type="text" class="search-box" id="searchBox" placeholder="Search by title or hook..." oninput="filterSearch()">
+    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+      <input type="text" class="search-box" id="searchBox" placeholder="Search by title or hook..." oninput="filterSearch()">
+      <button class="btn-manifest" onclick="downloadManifest()">📥 Export Manifest CSV</button>
+    </div>
   </div>
 
   <div class="shorts-grid" id="shortsGrid">
@@ -451,9 +469,10 @@ function renderCards(list) {
   list.forEach(s => {
     const card = document.createElement('div');
     card.className = 'short-card';
+    const posterAttr = s.thumb_path ? `poster="/api/thumb?path=${encodeURIComponent(s.thumb_path)}"` : '';
     card.innerHTML = `
       <div class="player-wrapper">
-        <video controls preload="metadata" playsinline src="/api/video?path=${encodeURIComponent(s.path)}"></video>
+        <video controls preload="metadata" playsinline ${posterAttr} src="/api/video?path=${encodeURIComponent(s.path)}"></video>
       </div>
       <div class="card-body">
         <div class="card-title">${escapeHtml(s.title)}</div>
@@ -478,6 +497,10 @@ function copyMeta(s) {
   navigator.clipboard.writeText(text).then(() => {
     showToast('Copied Title & Tags for "' + s.title + '"!');
   });
+}
+
+function downloadManifest() {
+  window.open('/api/manifest?folder=' + encodeURIComponent(ACTIVE_FOLDER), '_blank');
 }
 
 function showToast(msg) {
@@ -607,6 +630,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                                 "description": meta.get("description", ""),
                                 "hashtags": meta.get("hashtags", []),
                                 "size_mb": size_mb,
+                                "thumb_path": os.path.join(dp, f"{base_name}_thumb.jpg").replace("\\", "/") if os.path.isfile(os.path.join(dp, f"{base_name}_thumb.jpg")) else "",
                                 "path": m.replace("\\", "/")
                             })
                         total_count += len(shorts_list)
@@ -667,6 +691,58 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                         self.wfile.write(chunk)
                 return
             self.send_error(404, "File Not Found")
+            return
+
+        if url.path == "/api/thumb":
+            qs = urllib.parse.parse_qs(url.query)
+            thumb_path = qs.get("path", [None])[0]
+            if thumb_path and os.path.isfile(thumb_path):
+                self.send_response(200)
+                self.send_header("Content-Type", "image/jpeg")
+                self.send_header("Content-Length", str(os.path.getsize(thumb_path)))
+                self.send_header("Cache-Control", "public, max-age=86400")
+                self.end_headers()
+                with open(thumb_path, "rb") as f:
+                    while chunk := f.read(64 * 1024):
+                        self.wfile.write(chunk)
+                return
+            self.send_error(404, "Thumbnail Not Found")
+            return
+
+        if url.path == "/api/manifest":
+            qs = urllib.parse.parse_qs(url.query)
+            folder = qs.get("folder", ["ALL"])[0]
+            base_dir = "S:/edited vid/viral shorts"
+            manifest_file = os.path.join(base_dir, folder, "upload_manifest.csv")
+            if folder != "ALL" and os.path.isfile(manifest_file):
+                self.send_response(200)
+                self.send_header("Content-Type", "text/csv; charset=utf-8")
+                self.send_header("Content-Disposition", f'attachment; filename="{folder}_manifest.csv"')
+                self.end_headers()
+                with open(manifest_file, "rb") as f:
+                    self.wfile.write(f.read())
+                return
+            # If ALL, combine manifests
+            combined_rows = []
+            headers = None
+            if os.path.isdir(base_dir):
+                for d in sorted(os.listdir(base_dir)):
+                    mf = os.path.join(base_dir, d, "upload_manifest.csv")
+                    if os.path.isfile(mf):
+                        with open(mf, "r", encoding="utf-8") as f:
+                            lines = f.readlines()
+                            if lines:
+                                if headers is None:
+                                    headers = lines[0]
+                                combined_rows.extend(lines[1:])
+            if headers:
+                self.send_response(200)
+                self.send_header("Content-Type", "text/csv; charset=utf-8")
+                self.send_header("Content-Disposition", 'attachment; filename="all_shorts_manifest.csv"')
+                self.end_headers()
+                self.wfile.write(headers.encode("utf-8") + "".join(combined_rows).encode("utf-8"))
+                return
+            self.send_error(404, "No Manifest Found")
             return
 
         self.send_error(404)

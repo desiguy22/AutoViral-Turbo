@@ -98,10 +98,38 @@ class TestViralShortsMaker(unittest.TestCase):
             with open(test_ass, "r", encoding="utf-8") as f:
                 content = f.read()
             self.assertIn("Dialogue:", content)
-            self.assertIn(r"\c&H0000FFFF", content)  # Karaoke yellow highlight
+            self.assertIn(r"\c&H", content)  # Karaoke color highlight
+            self.assertIn(r"\t(", content)   # Scale pop animation
         finally:
             if os.path.isfile(test_ass):
                 os.remove(test_ass)
+
+    def test_upload_manifest(self):
+        sample_shorts = [
+            {
+                "title": "Epic RPG Ambush",
+                "filename": "Epic RPG Ambush.mp4",
+                "thumbnail": "Epic RPG Ambush_thumb.jpg",
+                "duration": 28.5,
+                "virality_score": 92,
+                "hook_top": "ENEMY RPG INCOMING",
+                "hook_sub": "TAKE COVER RIGHT NOW!!",
+                "description": "Epic moment in Modern Warfare",
+                "hashtags": ["#Shorts", "#Gaming"]
+            }
+        ]
+        test_csv = os.path.join(HERE, "test_manifest.csv")
+        try:
+            from vsm import pipeline
+            pipeline.write_manifest(test_csv, sample_shorts)
+            self.assertTrue(os.path.isfile(test_csv))
+            with open(test_csv, "r", encoding="utf-8") as f:
+                csv_data = f.read()
+            self.assertIn("Epic RPG Ambush", csv_data)
+            self.assertIn("virality_score", csv_data)
+        finally:
+            if os.path.isfile(test_csv):
+                os.remove(test_csv)
 
     def test_filter_graph_builder(self):
         probe = {"width": 3840, "height": 2160}

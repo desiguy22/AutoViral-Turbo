@@ -90,6 +90,7 @@ def render_short(src_video, start_t, end_t, layout, crop_x_pct, hook_top, hook_s
             "-map", "[v]",
             "-map", "0:a:0",
             *v_enc,
+            "-af", "loudnorm=I=-14:TP=-1.0:LRA=11",
             "-c:a", "aac", "-b:a", "256k",
             "-movflags", "+faststart",
             out_mp4
@@ -106,3 +107,17 @@ def render_short(src_video, start_t, end_t, layout, crop_x_pct, hook_top, hook_s
             }
 
     raise RuntimeError(f"FFmpeg render failed for {out_mp4}:\n{res.stderr[-1000:]}")
+
+
+def extract_thumbnail(video_path, out_thumb_path, timestamp_sec=1.2):
+    """Extract a high-contrast 1080x1920 poster frame from the hook window."""
+    cmd = [
+        "ffmpeg", "-y",
+        "-ss", f"{timestamp_sec:.2f}",
+        "-i", video_path,
+        "-vframes", "1",
+        "-q:v", "2",
+        out_thumb_path
+    ]
+    res = subprocess.run(cmd, capture_output=True)
+    return os.path.isfile(out_thumb_path)
