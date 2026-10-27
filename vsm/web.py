@@ -24,6 +24,7 @@ except Exception:
     pass
 
 from . import pipeline
+from . import publisher
 
 PORT = 8501
 CURRENT_JOB = {
@@ -172,6 +173,150 @@ HTML_PAGE = """<!DOCTYPE html>
   .btn-manifest:hover {
     background: rgba(0, 230, 118, 0.15);
     border-color: var(--green);
+  }
+  .btn-schedule {
+    background: linear-gradient(135deg, #7928ca, #ff0080);
+    border: none;
+    color: #fff;
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(255, 0, 128, 0.3);
+    transition: all 0.2s;
+  }
+  .btn-schedule:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 0, 128, 0.45);
+  }
+  .modal-backdrop {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.82);
+    backdrop-filter: blur(6px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-dialog {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    max-width: 1050px;
+    width: 100%;
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.7);
+  }
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-close {
+    background: transparent;
+    border: none;
+    color: var(--subtext);
+    font-size: 1.8rem;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .modal-close:hover { color: #fff; }
+  .modal-controls {
+    display: flex;
+    gap: 16px;
+    padding: 16px 24px;
+    background: #0f111a;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .modal-controls label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--subtext);
+    margin-right: 8px;
+    text-transform: uppercase;
+  }
+  .modal-controls select, .modal-controls input {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    outline: none;
+  }
+  .modal-body {
+    padding: 20px 24px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    background: #0f111a;
+    flex-wrap: wrap;
+  }
+  .btn-secondary {
+    background: #1c2130;
+    border: 1px solid var(--border);
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-secondary:hover { background: #252c40; }
+  .sched-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+  .sched-table th {
+    text-align: left;
+    padding: 10px 12px;
+    color: var(--subtext);
+    border-bottom: 1px solid var(--border);
+    font-weight: 700;
+  }
+  .sched-table td {
+    padding: 12px;
+    border-bottom: 1px solid #1a1e2e;
+    vertical-align: middle;
+  }
+  .sched-badge {
+    background: linear-gradient(135deg, #00e676, #00b0ff);
+    color: #000;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+  }
+  .pinned-box {
+    background: #0a0b10;
+    border-left: 3px solid #ff0080;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: #ccc;
+    margin-top: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
   }
 
   .shorts-grid {
@@ -360,6 +505,7 @@ HTML_PAGE = """<!DOCTYPE html>
     </div>
     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
       <input type="text" class="search-box" id="searchBox" placeholder="Search by title or hook..." oninput="filterSearch()">
+      <button class="btn-schedule" onclick="openScheduleModal()">🚀 Schedule & Auto-Publish</button>
       <button class="btn-manifest" onclick="downloadManifest()">📥 Export Manifest CSV</button>
     </div>
   </div>
@@ -377,8 +523,8 @@ HTML_PAGE = """<!DOCTYPE html>
       <label>Input Video Path</label>
       <input type="text" id="videoPath" value="S:/edited vid/codmw4_3.mp4" placeholder="S:/edited vid/video.mp4" required>
 
-      <label>Number of Shorts</label>
-      <input type="number" id="numShorts" value="10" min="1" max="25">
+      <label>Number of Shorts (0 for Uncapped Auto-Detect)</label>
+      <input type="number" id="numShorts" value="0" min="0" max="50" placeholder="0 = Auto-Detect All">
 
       <label>Framing Layout</label>
       <select id="layout">
@@ -405,6 +551,43 @@ HTML_PAGE = """<!DOCTYPE html>
       <div class="progress-bar-bg">
         <div class="progress-bar-fill" id="progressFill"></div>
       </div>
+    </div>
+  </div>
+<!-- SCHEDULE MODAL -->
+<div id="scheduleModal" class="modal-backdrop" style="display: none;">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <div>
+        <h2 style="font-size: 1.3rem; font-weight: 800;">🚀 Autonomous Multi-Platform Publishing Queue</h2>
+        <div style="color: var(--subtext); font-size: 0.85rem; margin-top: 4px;">Automated daily cadence (12:00 PM, 5:00 PM, 8:00 PM) prioritized by highest virality first.</div>
+      </div>
+      <button class="modal-close" onclick="closeScheduleModal()">&times;</button>
+    </div>
+    <div class="modal-controls">
+      <div>
+        <label>Collection:</label>
+        <select id="schedFolderSelect" onchange="loadScheduleData()"></select>
+      </div>
+      <div>
+        <label>Cadence:</label>
+        <select id="schedSlotsSelect" onchange="loadScheduleData()">
+          <option value="3">3 Shorts/Day (12PM, 5PM, 8PM)</option>
+          <option value="2">2 Shorts/Day (12PM, 8PM)</option>
+          <option value="1">1 Short/Day (5PM)</option>
+        </select>
+      </div>
+      <div>
+        <label>Start Date:</label>
+        <input type="date" id="schedStartDate" onchange="loadScheduleData()">
+      </div>
+    </div>
+    <div class="modal-body" id="schedQueueContent">
+      <div style="text-align: center; padding: 40px; color: var(--subtext);">Generating optimized publishing queue...</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="exportScheduleFormat('json')">💾 Export JSON Dispatch</button>
+      <button class="btn-secondary" onclick="exportScheduleFormat('csv')">📥 Download Schedule CSV</button>
+      <button class="btn-schedule" onclick="confirmSaveSchedule()">⚡ Save & Lock Schedule</button>
     </div>
   </div>
 </div>
@@ -558,9 +741,11 @@ document.getElementById('genForm').addEventListener('submit', async (e) => {
   btn.disabled = true;
   pWrap.style.display = 'block';
 
+  const numInput = parseInt(document.getElementById('numShorts').value);
+  const numVal = (isNaN(numInput) || numInput <= 0) ? 'auto' : numInput;
   const payload = {
     video: document.getElementById('videoPath').value,
-    num: parseInt(document.getElementById('numShorts').value),
+    num: numVal,
     tracker: document.getElementById('tracker').value,
     layout: document.getElementById('layout').value
   };
@@ -596,6 +781,136 @@ async function pollStatus() {
     alert('Pipeline error: ' + data.error);
   } else {
     setTimeout(pollStatus, 1500);
+  }
+}
+
+function escapeJs(str) {
+  if (!str) return '';
+  return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, ' ');
+}
+
+let CURRENT_SCHEDULE = null;
+
+function openScheduleModal() {
+  const modal = document.getElementById('scheduleModal');
+  modal.style.display = 'flex';
+  
+  const sel = document.getElementById('schedFolderSelect');
+  sel.innerHTML = '<option value="ALL">All Collections</option>';
+  const pills = document.querySelectorAll('.folder-pill');
+  pills.forEach(p => {
+    const text = p.innerText.split(' (')[0];
+    if (text && !text.startsWith('All')) {
+      const opt = document.createElement('option');
+      opt.value = text;
+      opt.innerText = text;
+      if (text === ACTIVE_FOLDER) opt.selected = true;
+      sel.appendChild(opt);
+    }
+  });
+  
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  document.getElementById('schedStartDate').value = tomorrow.toISOString().split('T')[0];
+  
+  loadScheduleData();
+}
+
+function closeScheduleModal() {
+  document.getElementById('scheduleModal').style.display = 'none';
+}
+
+async function loadScheduleData() {
+  const folder = document.getElementById('schedFolderSelect').value;
+  const slots = document.getElementById('schedSlotsSelect').value;
+  const startDate = document.getElementById('schedStartDate').value;
+  const container = document.getElementById('schedQueueContent');
+  container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--subtext);">Calculating optimal publication cadence...</div>';
+  
+  try {
+    const res = await fetch(`/api/schedule?folder=${encodeURIComponent(folder)}&slots=${slots}&start_date=${startDate}`);
+    const data = await res.json();
+    CURRENT_SCHEDULE = data;
+    renderScheduleQueue(data);
+  } catch (err) {
+    container.innerHTML = `<div style="color: red; text-align: center; padding: 30px;">Error generating schedule: ${err}</div>`;
+  }
+}
+
+function renderScheduleQueue(data) {
+  const container = document.getElementById('schedQueueContent');
+  if (!data || !data.queue || data.queue.length === 0) {
+    container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--subtext);">No shorts found to schedule.</div>';
+    return;
+  }
+  
+  let html = `
+    <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+      <span style="font-size: 0.9rem; color: var(--green); font-weight: 700;">✓ ${data.total_scheduled} Shorts Queued (${data.slots_per_day}x daily)</span>
+      <span style="font-size: 0.8rem; color: var(--subtext);">Prioritized by Virality Score</span>
+    </div>
+    <table class="sched-table">
+      <thead>
+        <tr>
+          <th style="width: 50px;">Rank</th>
+          <th style="width: 170px;">Slot / Time</th>
+          <th>Short Title</th>
+          <th style="width: 70px;">Virality</th>
+          <th>Pinned Discussion Prompt</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+  
+  data.queue.forEach(item => {
+    html += `
+      <tr>
+        <td><strong>#${item.rank}</strong></td>
+        <td>
+          <div style="font-weight: 700; color: #fff;">${item.scheduled_date}</div>
+          <div style="font-size: 0.75rem; color: #00b0ff;">${item.slot_label}</div>
+        </td>
+        <td>
+          <div style="font-weight: 700; color: #fff;">${escapeHtml(item.title)}</div>
+          <div style="font-size: 0.75rem; color: var(--subtext);">${escapeHtml(item.filename)}</div>
+        </td>
+        <td><span class="sched-badge">${item.virality_score}/100</span></td>
+        <td>
+          <div class="pinned-box">
+            <span>${escapeHtml(item.pinned_comment)}</span>
+            <button style="background:transparent;border:none;color:#ff0080;cursor:pointer;font-size:0.75rem;font-weight:700;" onclick="copyTextToClipboard('${escapeJs(item.pinned_comment)}').then(()=>showToast('Pinned comment copied!'))">Copy</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  });
+  
+  html += `</tbody></table>`;
+  container.innerHTML = html;
+}
+
+function exportScheduleFormat(fmt) {
+  const folder = document.getElementById('schedFolderSelect').value;
+  const slots = document.getElementById('schedSlotsSelect').value;
+  const startDate = document.getElementById('schedStartDate').value;
+  window.open(`/api/schedule/export?folder=${encodeURIComponent(folder)}&slots=${slots}&start_date=${startDate}&format=${fmt}`, '_blank');
+}
+
+async function confirmSaveSchedule() {
+  const folder = document.getElementById('schedFolderSelect').value;
+  const slots = document.getElementById('schedSlotsSelect').value;
+  const startDate = document.getElementById('schedStartDate').value;
+  try {
+    const res = await fetch('/api/schedule', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({folder, slots, start_date: startDate})
+    });
+    const data = await res.json();
+    showToast(`Schedule saved! (${data.total_scheduled} shorts locked)`);
+    closeScheduleModal();
+  } catch (err) {
+    alert('Failed to save schedule: ' + err);
   }
 }
 
@@ -773,9 +1088,120 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             self.send_error(404, "No Manifest Found")
             return
 
+        if url.path == "/api/schedule":
+            qs = urllib.parse.parse_qs(url.query)
+            folder = qs.get("folder", ["ALL"])[0]
+            slots = int(qs.get("slots", ["3"])[0])
+            start_date = qs.get("start_date", [None])[0]
+            base_dir = "S:/edited vid/viral shorts"
+            
+            shorts = []
+            if folder != "ALL":
+                shorts = publisher.load_shorts_from_folder(os.path.join(base_dir, folder))
+            else:
+                if os.path.isdir(base_dir):
+                    for d in sorted(os.listdir(base_dir)):
+                        shorts.extend(publisher.load_shorts_from_folder(os.path.join(base_dir, d)))
+            
+            sched = publisher.generate_schedule(shorts, start_date=start_date, slots_per_day=slots)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(json.dumps(sched, ensure_ascii=False).encode("utf-8"))
+            return
+
+        if url.path == "/api/schedule/export":
+            qs = urllib.parse.parse_qs(url.query)
+            folder = qs.get("folder", ["ALL"])[0]
+            slots = int(qs.get("slots", ["3"])[0])
+            start_date = qs.get("start_date", [None])[0]
+            fmt = qs.get("format", ["csv"])[0].lower()
+            base_dir = "S:/edited vid/viral shorts"
+            
+            shorts = []
+            if folder != "ALL":
+                shorts = publisher.load_shorts_from_folder(os.path.join(base_dir, folder))
+            else:
+                if os.path.isdir(base_dir):
+                    for d in sorted(os.listdir(base_dir)):
+                        shorts.extend(publisher.load_shorts_from_folder(os.path.join(base_dir, d)))
+                        
+            sched = publisher.generate_schedule(shorts, start_date=start_date, slots_per_day=slots)
+            
+            if fmt == "json":
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Disposition", f'attachment; filename="{folder}_schedule.json"')
+                self.end_headers()
+                self.wfile.write(json.dumps(sched, indent=2, ensure_ascii=False).encode("utf-8"))
+                return
+            else:
+                import io
+                out_io = io.StringIO()
+                fieldnames = [
+                    "rank", "scheduled_date", "scheduled_time", "slot_label",
+                    "virality_score", "title", "filename", "thumbnail",
+                    "pinned_comment", "youtube_title", "tiktok_caption"
+                ]
+                writer = csv.DictWriter(out_io, fieldnames=fieldnames)
+                writer.writeheader()
+                for item in sched.get("queue", []):
+                    writer.writerow({
+                        "rank": item["rank"],
+                        "scheduled_date": item["scheduled_date"],
+                        "scheduled_time": item["scheduled_time"],
+                        "slot_label": item["slot_label"],
+                        "virality_score": item["virality_score"],
+                        "title": item["title"],
+                        "filename": item["filename"],
+                        "thumbnail": item.get("thumbnail", ""),
+                        "pinned_comment": item["pinned_comment"],
+                        "youtube_title": item["platforms"]["youtube"]["title"],
+                        "tiktok_caption": item["platforms"]["tiktok"]["caption"]
+                    })
+                csv_bytes = out_io.getvalue().encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/csv; charset=utf-8")
+                self.send_header("Content-Disposition", f'attachment; filename="{folder}_schedule.csv"')
+                self.end_headers()
+                self.wfile.write(csv_bytes)
+                return
+
         self.send_error(404)
 
     def do_POST(self):
+        if self.path == "/api/schedule":
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length)
+            data = json.loads(body.decode("utf-8"))
+            folder = data.get("folder", "ALL")
+            slots = int(data.get("slots", 3))
+            start_date = data.get("start_date")
+            base_dir = "S:/edited vid/viral shorts"
+            
+            shorts = []
+            if folder != "ALL":
+                target_folder = os.path.join(base_dir, folder)
+                shorts = publisher.load_shorts_from_folder(target_folder)
+            else:
+                target_folder = base_dir
+                if os.path.isdir(base_dir):
+                    for d in sorted(os.listdir(base_dir)):
+                        shorts.extend(publisher.load_shorts_from_folder(os.path.join(base_dir, d)))
+            
+            sched = publisher.generate_schedule(shorts, start_date=start_date, slots_per_day=slots)
+            publisher.save_schedule_files(sched, target_folder)
+            
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "status": "saved",
+                "total_scheduled": sched["total_scheduled"],
+                "queue": sched["queue"]
+            }, ensure_ascii=False).encode("utf-8"))
+            return
+
         if self.path == "/api/start":
             length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(length)
@@ -804,9 +1230,18 @@ def run_pipeline_job(data):
         CURRENT_JOB["progress"] = pct
 
     try:
+        num_raw = data.get("num", "auto")
+        if num_raw in (0, "0", None, "") or str(num_raw).lower() in ("auto", "all"):
+            num_shorts = "auto"
+        else:
+            try:
+                num_shorts = int(num_raw)
+            except Exception:
+                num_shorts = "auto"
+
         results = pipeline.process_video(
             src_video=data["video"],
-            num_shorts=data.get("num", 10),
+            num_shorts=num_shorts,
             target_len=data.get("target_len", 32.0),
             forced_layout=None if data.get("layout") == "auto" else data.get("layout"),
             tracker=data.get("tracker", "auto"),

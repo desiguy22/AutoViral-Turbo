@@ -23,7 +23,7 @@ if HERE not in sys.path:
 
 from vsm import pipeline
 
-def run_batch(video_paths, num_shorts=10, out_base=None, force=False):
+def run_batch(video_paths, num_shorts="auto", out_base=None, force=False):
     if out_base is None:
         out_base = "S:/edited vid/viral shorts"
     os.makedirs(out_base, exist_ok=True)
@@ -87,12 +87,29 @@ def run_batch(video_paths, num_shorts=10, out_base=None, force=False):
 
 if __name__ == "__main__":
     force = False
+    num_shorts = "auto"
     args = []
-    for a in sys.argv[1:]:
-        if a == "--force":
+    i = 1
+    while i < len(sys.argv):
+        arg = sys.argv[i]
+        if arg == "--force":
             force = True
+        elif arg in ("--num", "-n") and i + 1 < len(sys.argv):
+            val = sys.argv[i + 1]
+            if val.isdigit():
+                num_shorts = "auto" if int(val) <= 0 else int(val)
+            else:
+                num_shorts = "auto" if val.lower() in ("auto", "all") else val
+            i += 1
+        elif arg.startswith("--num="):
+            val = arg.split("=", 1)[1]
+            if val.isdigit():
+                num_shorts = "auto" if int(val) <= 0 else int(val)
+            else:
+                num_shorts = "auto" if val.lower() in ("auto", "all") else val
         else:
-            args.append(a)
+            args.append(arg)
+        i += 1
 
     if args:
         targets = args
@@ -111,4 +128,4 @@ if __name__ == "__main__":
         ]
         targets = [os.path.join(source_dir, f) for f in priority_order if os.path.exists(os.path.join(source_dir, f))]
 
-    run_batch(targets, num_shorts=10, force=force)
+    run_batch(targets, num_shorts=num_shorts, force=force)

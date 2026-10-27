@@ -22,7 +22,7 @@ from . import hooks
 from . import render
 
 
-def process_video(src_video, output_dir=None, num_shorts=5, min_len=20.0, max_len=45.0,
+def process_video(src_video, output_dir=None, num_shorts="auto", min_len=20.0, max_len=45.0,
                   target_len=32.0, whisper_model="base", forced_layout=None,
                   tracker="auto", use_local_llm=True, progress_cb=None, force=False):
     """Process a single video into high-engagement viral shorts.
@@ -73,11 +73,12 @@ def process_video(src_video, output_dir=None, num_shorts=5, min_len=20.0, max_le
             except Exception:
                 pass
 
+    display_target = "Auto-Detect (Uncapped)" if (num_shorts in ("auto", 0, None) or str(num_shorts).lower() == "auto") else f"{num_shorts} Shorts"
     print(f"\n=================================================================")
     print(f"🎬 VIRAL SHORTS MAKER: {video_name}")
     print(f"   Source:     {src_video}")
     print(f"   Output:     {video_out_dir}")
-    print(f"   Target:     {num_shorts} Shorts ({min_len}s - {max_len}s)")
+    print(f"   Target:     {display_target} ({min_len}s - {max_len}s)")
     print(f"   Tracker:    {tracker.upper()} (Benchmark & Framing)")
     print(f"   Local LLM:  {'Enabled (Qwen2.5 on GPU)' if use_local_llm else 'Disabled (Heuristic)'}")
     print(f"=================================================================")
@@ -139,9 +140,10 @@ def process_video(src_video, output_dir=None, num_shorts=5, min_len=20.0, max_le
         m_start = moment["start"]
         m_end = moment["end"]
         m_dur = m_end - m_start
+        peak_t = m_dur * moment.get("parts", {}).get("peak_pos", 0.5)
 
-        # Generate metadata (Title, Hook, Description, Hashtags) via Local LLM or Heuristics with deduplication
-        meta = hooks.generate_metadata(moment, video_title=video_name, use_local_llm=use_local_llm, existing_titles=seen_titles)
+        # Generate metadata (Title, Hook, Description, Hashtags) via Local LLM or Heuristics with Multimodal Vision Keyframes
+        meta = hooks.generate_metadata(moment, video_title=video_name, use_local_llm=use_local_llm, existing_titles=seen_titles, src_video=src_video)
         seen_titles.add(meta["title"])
         
         # Ensure unique Windows-safe filename
@@ -185,7 +187,7 @@ def process_video(src_video, output_dir=None, num_shorts=5, min_len=20.0, max_le
 
         print(f"\n[{idx}/{len(ranked)}] Rendering: '{meta['title']}'")
         print(f"      File:      {final_filename}.mp4")
-        print(f"      Time:      {m_start:.1f}s - {m_end:.1f}s ({m_dur:.1f}s)")
+        print(f"      Time:      {m_start:.1f}s - {m_end:.1f}s ({m_dur:.1f}s, Peak: +{peak_t:.1f}s)")
         print(f"      Layout:    {layout} (Crop X: {crop_x:.2f}) [Tracker: {tracker}]")
         print(f"      Hook (2s): {meta['hook_top']} | {meta['hook_sub']} (Score: {meta['hook_score']}/100)")
         print(f"      Engine:    {meta.get('engine', 'heuristic')}")
@@ -193,7 +195,7 @@ def process_video(src_video, output_dir=None, num_shorts=5, min_len=20.0, max_le
         # Generate word-level animated subtitles
         subtitles.create_ass_subtitles(moment["sentences"], m_start, m_end, ass_path)
 
-        # Render video
+        # Render video with dynamic punch zoom and auto-ducked tension music
         res = render.render_short(
             src_video=src_video,
             start_t=m_start,
@@ -203,7 +205,8 @@ def process_video(src_video, output_dir=None, num_shorts=5, min_len=20.0, max_le
             hook_top=meta["hook_top"],
             hook_sub=meta["hook_sub"],
             ass_path=ass_path,
-            out_mp4=out_mp4
+            out_mp4=out_mp4,
+            peak_t=peak_t
         )
 
         # Extract high-contrast 1080x1920 action poster thumbnail

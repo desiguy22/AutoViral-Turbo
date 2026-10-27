@@ -107,19 +107,22 @@ def score_window(s, e, ctx):
     if peak_pos > 0.6:
         end += 0.4
     nc = sum(1 for c in ctx["cuts"] if s < c < e)
+    max_speech_hook = max((f["hook"] for f in feats), default=0.0)
     parts = {
         "energy": _mean(zl, a, b),
         "peak": peak,
+        "peak_pos": round(float(peak_pos), 2),
         "motion": _mean(zm, a, b),
         "pacing": min(3.0, nc / dur * 10.0),
         "speech": min(3.0, nw / dur),
         "emotion": min(3.0, emo / dur * 10.0),
         "hook": hook,
+        "speech_hook": round(float(max_speech_hook), 1),
         "payoff": end,
         "dead_air": dead,
         "length": -abs(dur - ctx["target"]) / ctx["target"],
     }
-    total = sum(ctx["weights"][k] * v for k, v in parts.items())
+    total = sum(ctx["weights"].get(k, 0.0) * v for k, v in parts.items())
     return total, parts
 
 
@@ -127,9 +130,14 @@ WEIGHTS = {"energy": 1.0, "peak": 0.6, "motion": 0.5, "pacing": 0.3, "speech": 0
            "hook": 1.0, "payoff": 0.5, "dead_air": -2.5, "length": 1.0}
 
 
-def rank_moments(segments, sig, duration, n=5, min_len=20.0, max_len=45.0, target=32.0, weights=None,
+def rank_moments(segments, sig, duration, n="auto", min_len=20.0, max_len=45.0, target=32.0, weights=None,
                  min_gap=2.0):
-    """Return up to n non-overlapping clips: [{start, end, score, virality, parts, sentences}] best first."""
+    """Return non-overlapping clips: [{start, end, score, virality, parts, sentences}] best first.
+    
+    If n is 'auto', None, or 0, automatically selects all non-overlapping moments meeting
+    virality score >= 72 and engagement signals (peak >= 1.0 or motion >= 0.4 or speech hook >= 25)
+    without an arbitrary cap.
+    """
     if duration < min_len:
         min_len = max(1.0, duration)
         max_len = duration
@@ -164,21 +172,49 @@ def rank_moments(segments, sig, duration, n=5, min_len=20.0, max_len=45.0, targe
         return []
     cands.sort(key=lambda c: -c[0])
     all_scores = np.array([c[0] for c in cands])
+    
+    is_auto = (n is None) or (isinstance(n, (int, float)) and n <= 0) or (isinstance(n, str) and n.strip().lower() in ("auto", "0", "none", "all"))
     picked = []
-    for total, s, e, parts in cands:
-        if any(s < pe + min_gap and e > ps - min_gap for ps, pe, *_ in picked):
-            continue
-        picked.append((s, e, total, parts))
-        if len(picked) >= n:
-            break
+    
+    if is_auto:
+        for total, s, e, parts in cands:
+            pct = float((all_scores < total).mean()) if len(all_scores) > 1 else 1.0
+            virality = int(round(40 + 59 * pct))
+            speech_hook = parts.get("speech_hook", 0.0)
+            has_engagement = (parts.get("peak", 0.0) >= 1.0 or parts.get("motion", 0.0) >= 0.4 or speech_hook >= 25.0)
+            if virality < 72 or not has_engagement:
+                continue
+            if any(s < pe + min_gap and e > ps - min_gap for ps, pe, *_ in picked):
+                continue
+            picked.append((s, e, total, parts, virality))
+            
+        # Fallback to at least the top candidate if no clip strictly crossed 72
+        if not picked and cands:
+            total, s, e, parts = cands[0]
+            pct = float((all_scores < total).mean()) if len(all_scores) > 1 else 1.0
+            virality = int(round(40 + 59 * pct))
+            picked.append((s, e, total, parts, virality))
+    else:
+        target_count = int(n)
+        for total, s, e, parts in cands:
+            if any(s < pe + min_gap and e > ps - min_gap for ps, pe, *_ in picked):
+                continue
+            pct = float((all_scores < total).mean()) if len(all_scores) > 1 else 1.0
+            virality = int(round(40 + 59 * pct))
+            picked.append((s, e, total, parts, virality))
+            if len(picked) >= target_count:
+                break
+
     out = []
-    for s, e, total, parts in picked:
-        pct = float((all_scores < total).mean())
-        out.append({"start": round(s, 2), "end": round(e, 2), "score": round(total, 3),
-                    # relative to other windows of THIS video, not a prediction of views
-                    "virality": int(round(40 + 59 * pct)),
-                    "parts": {k: round(v, 3) for k, v in parts.items()},
-                    "sentences": [x for x in sents if x["start"] >= s - 1e-6 and x["end"] <= e + 1e-6]})
+    for s, e, total, parts, virality in picked:
+        out.append({
+            "start": round(s, 2),
+            "end": round(e, 2),
+            "score": round(total, 3),
+            "virality": virality,
+            "parts": {k: round(v, 3) for k, v in parts.items()},
+            "sentences": [x for x in sents if x["start"] >= s - 1e-6 and x["end"] <= e + 1e-6]
+        })
     return out
 
 

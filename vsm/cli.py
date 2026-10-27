@@ -18,7 +18,7 @@ def main():
         description="Viral Shorts Maker - Turn any video into high-engagement Shorts/Reels"
     )
     parser.add_argument("video", help="Path to input video file (e.g. S:/edited vid/codmw4_3.mp4)")
-    parser.add_argument("-n", "--num", type=int, default=5, help="Number of viral shorts to generate (default: 5)")
+    parser.add_argument("-n", "--num", default="auto", help="Number of viral shorts to generate or 'auto' for uncapped detection (default: auto)")
     parser.add_argument("-o", "--out", default=None, help="Output directory (default: <video_dir>/viral_shorts/<video_name>)")
     parser.add_argument("--min-len", type=float, default=20.0, help="Minimum clip duration in seconds (default: 20)")
     parser.add_argument("--max-len", type=float, default=45.0, help="Maximum clip duration in seconds (default: 45)")
@@ -31,12 +31,21 @@ def main():
     
     args = parser.parse_args()
     
+    num_arg = args.num
+    if isinstance(num_arg, str) and num_arg.strip().isdigit():
+        num_val = int(num_arg)
+        num_shorts = "auto" if num_val <= 0 else num_val
+    elif str(num_arg).strip().lower() in ("auto", "none", "0"):
+        num_shorts = "auto"
+    else:
+        num_shorts = num_arg
+
     forced_layout = None if args.layout == "auto" else args.layout
     
     pipeline.process_video(
         src_video=args.video,
         output_dir=args.out,
-        num_shorts=args.num,
+        num_shorts=num_shorts,
         min_len=args.min_len,
         max_len=args.max_len,
         target_len=args.target_len,
