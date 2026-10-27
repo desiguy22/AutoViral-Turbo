@@ -24,7 +24,8 @@ from . import render
 
 def process_video(src_video, output_dir=None, num_shorts="auto", min_len=20.0, max_len=45.0,
                   target_len=32.0, whisper_model="base", forced_layout=None,
-                  tracker="auto", use_local_llm=True, progress_cb=None, force=False):
+                  tracker="auto", use_local_llm=True, progress_cb=None, force=False,
+                  filename_suffix=""):
     """Process a single video into high-engagement viral shorts.
     
     Args:
@@ -147,7 +148,7 @@ def process_video(src_video, output_dir=None, num_shorts="auto", min_len=20.0, m
         seen_titles.add(meta["title"])
         
         # Ensure unique Windows-safe filename
-        base_filename = meta["filename"]
+        base_filename = f"{meta['filename']}{filename_suffix}"
         final_filename = base_filename
         suffix = 1
         while final_filename in seen_filenames:

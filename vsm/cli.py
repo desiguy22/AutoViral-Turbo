@@ -28,6 +28,7 @@ def main():
     parser.add_argument("--tracker", choices=["auto", "yolo", "opencv", "compare"], default="auto",
                         help="Subject tracking engine or compare phase (default: auto)")
     parser.add_argument("--no-local-llm", action="store_true", help="Disable local GPU neural LLM (use pure heuristics)")
+    parser.add_argument("--suffix", default="", help="Optional suffix to append to filenames (e.g. _new)")
     
     args = parser.parse_args()
     
@@ -52,7 +53,8 @@ def main():
         whisper_model=args.whisper_model,
         forced_layout=forced_layout,
         tracker=args.tracker,
-        use_local_llm=not args.no_local_llm
+        use_local_llm=not args.no_local_llm,
+        filename_suffix=args.suffix
     )
 
 if __name__ == "__main__":

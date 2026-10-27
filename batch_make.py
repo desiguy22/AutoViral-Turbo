@@ -23,7 +23,7 @@ if HERE not in sys.path:
 
 from vsm import pipeline
 
-def run_batch(video_paths, num_shorts="auto", out_base=None, force=False):
+def run_batch(video_paths, num_shorts="auto", out_base=None, force=False, filename_suffix=""):
     if out_base is None:
         out_base = "S:/edited vid/viral shorts"
     os.makedirs(out_base, exist_ok=True)
@@ -34,6 +34,8 @@ def run_batch(video_paths, num_shorts="auto", out_base=None, force=False):
     print(f"🎯 Target shorts per video: {num_shorts}")
     print(f"📂 Output base directory: {out_base}")
     print(f"🔄 Force regeneration: {force}")
+    if filename_suffix:
+        print(f"🏷️ Filename suffix: {filename_suffix}")
     print(f"================================================================\n")
 
     overall_start = time.time()
@@ -57,7 +59,8 @@ def run_batch(video_paths, num_shorts="auto", out_base=None, force=False):
                 target_len=32.0,
                 tracker="auto",
                 use_local_llm=True,
-                force=force
+                force=force,
+                filename_suffix=filename_suffix
             )
             v_elapsed = time.time() - v_start
             results[vname] = {"status": "SUCCESS", "count": len(shorts), "time_sec": v_elapsed}
@@ -88,12 +91,18 @@ def run_batch(video_paths, num_shorts="auto", out_base=None, force=False):
 if __name__ == "__main__":
     force = False
     num_shorts = "auto"
+    filename_suffix = ""
     args = []
     i = 1
     while i < len(sys.argv):
         arg = sys.argv[i]
         if arg == "--force":
             force = True
+        elif arg == "--suffix" and i + 1 < len(sys.argv):
+            filename_suffix = sys.argv[i + 1]
+            i += 1
+        elif arg.startswith("--suffix="):
+            filename_suffix = arg.split("=", 1)[1]
         elif arg in ("--num", "-n") and i + 1 < len(sys.argv):
             val = sys.argv[i + 1]
             if val.isdigit():
@@ -128,4 +137,4 @@ if __name__ == "__main__":
         ]
         targets = [os.path.join(source_dir, f) for f in priority_order if os.path.exists(os.path.join(source_dir, f))]
 
-    run_batch(targets, num_shorts=num_shorts, force=force)
+    run_batch(targets, num_shorts=num_shorts, force=force, filename_suffix=filename_suffix)
