@@ -608,7 +608,12 @@ async function loadLibrary() {
 
     ALL_SHORTS = [];
     const pillsContainer = document.getElementById('folderPills');
-    pillsContainer.innerHTML = '<div class="folder-pill active" onclick="filterFolder(\\'ALL\\')">All Collections (' + data.total_shorts + ')</div>';
+    pillsContainer.innerHTML = '';
+    const allPill = document.createElement('div');
+    allPill.className = 'folder-pill active';
+    allPill.innerText = 'All Collections (' + data.total_shorts + ')';
+    allPill.onclick = () => filterFolder('ALL');
+    pillsContainer.appendChild(allPill);
 
     for (const [folder, list] of Object.entries(data.folders)) {
       ALL_SHORTS.push(...list);
@@ -784,11 +789,6 @@ async function pollStatus() {
   }
 }
 
-function escapeJs(str) {
-  if (!str) return '';
-  return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, ' ');
-}
-
 let CURRENT_SCHEDULE = null;
 
 function openScheduleModal() {
@@ -878,7 +878,7 @@ function renderScheduleQueue(data) {
         <td>
           <div class="pinned-box">
             <span>${escapeHtml(item.pinned_comment)}</span>
-            <button style="background:transparent;border:none;color:#ff0080;cursor:pointer;font-size:0.75rem;font-weight:700;" onclick="copyTextToClipboard('${escapeJs(item.pinned_comment)}').then(()=>showToast('Pinned comment copied!'))">Copy</button>
+            <button class="btn-copy-pinned" style="background:transparent;border:none;color:#ff0080;cursor:pointer;font-size:0.75rem;font-weight:700;" data-comment="${encodeURIComponent(item.pinned_comment || '')}">Copy</button>
           </div>
         </td>
       </tr>
@@ -887,6 +887,12 @@ function renderScheduleQueue(data) {
   
   html += `</tbody></table>`;
   container.innerHTML = html;
+  container.querySelectorAll('.btn-copy-pinned').forEach(btn => {
+    btn.onclick = () => {
+      const comment = decodeURIComponent(btn.getAttribute('data-comment'));
+      copyTextToClipboard(comment).then(() => showToast('Pinned comment copied!'));
+    };
+  });
 }
 
 function exportScheduleFormat(fmt) {
@@ -1256,8 +1262,13 @@ def run_pipeline_job(data):
         CURRENT_JOB["error"] = str(e)
 
 
+class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+
 def start_server(port=PORT):
-    server = socketserver.TCPServer(("0.0.0.0", port), WebHandler)
+    server = ThreadedHTTPServer(("0.0.0.0", port), WebHandler)
     print(f"\n=======================================================")
     print(f">> AUTOVIRAL TURBO STUDIO RUNNING AT:")
     print(f"   http://localhost:{port}")
